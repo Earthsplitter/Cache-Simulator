@@ -34,9 +34,15 @@
         </div>
         <div v-if="source === 'input'" class="control-panel">
           <my-select :model="accessType"></my-select>
+          <label style="margin: 10px" for="address">地址:</label>
+          <input v-model="address" id="address" type="text"/>
+          <button id="accessButton">Access</button>
         </div>
       </section>
     </aside>
+    <main>
+      Hi
+    </main>
   </div>
 </template>
 
@@ -54,6 +60,7 @@
         cacheType: 'unionCache',
         source: 'file',
         loadMessage: '',
+        address: '',
         unionCacheSize: {
           name: '统一Cache大小',
           options: ['2KB', '4KB', '8KB', '16KB', '32KB', '64KB', '128KB', '256KB', '512KB', '1MB'],
@@ -100,7 +107,9 @@
           selected: '按写分配'
         },
         accessType: {
-          name: ''
+          name: '访问类型',
+          options: ['读指令', '读数据', '写数据'],
+          selected: '读指令'
         }
       }
     },
@@ -124,6 +133,7 @@
 
 <style>
   #app {
+    display: flex;
     box-sizing: content-box;
     font-family: 'Avenir', Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -135,6 +145,12 @@
   aside {
     margin: 0 20px;
     width: 35%;
+  }
+
+  main {
+    border: solid 2px #00bc9b;
+    font-size: 18px;
+    padding: 30px;
   }
 
   #settings {
@@ -155,9 +171,10 @@
   .control-panel {
     display: flex;
     justify-content: center;
+    flex-wrap: wrap;
     margin: 20px 0;
     border: solid 2px #00bc9b;
-    padding: 30px;
+    padding: 20px;
   }
 
   button {
@@ -177,5 +194,10 @@
 
   button:focus {
     outline: none;
+  }
+
+  input[type='text'] {
+    height: 20px;
+    margin: 10px;
   }
 </style>
