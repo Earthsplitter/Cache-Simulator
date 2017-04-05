@@ -29,7 +29,7 @@
       </section>
       <section>
         <div class="control-panel" v-if="source === 'file'">
-          <button>Single Step</button>
+          <button @click="run">Single Step</button>
           <button>Execute Automatically</button>
         </div>
         <div v-if="source === 'input'" class="control-panel">
@@ -41,7 +41,29 @@
       </section>
     </aside>
     <main>
-      Hi
+      <h1 style="width: 100%;text-align: center">模拟结果</h1>
+      <span class="showing-items" v-for="(data,key) in simulationComputed.summary">
+        {{key}}: {{data}}
+      </span>
+      <p style="width: 100%">其中:</p>
+      <span class="showing-items" v-for="(data,key) in simulationData.readInstruction">
+        {{key}}: {{data}}
+      </span>
+      <span class="showing-items" v-for="(data,key) in simulationComputed.readInstruction">
+        {{key}}: {{data}}
+      </span>
+      <span class="showing-items" v-for="(data,key) in simulationData.readData">
+        {{key}}: {{data}}
+      </span>
+      <span class="showing-items" v-for="(data,key) in simulationComputed.readData">
+        {{key}}: {{data}}
+      </span>
+      <span class="showing-items" v-for="(data,key) in simulationData.writeData">
+        {{key}}: {{data}}
+      </span>
+      <span class="showing-items" v-for="(data,key) in simulationComputed.writeData">
+        {{key}}: {{data}}
+      </span>
     </main>
   </div>
 </template>
@@ -57,6 +79,21 @@
     },
     data () {
       return {
+        loadInstruction: [],
+        simulationData: {
+          readInstruction: {
+            '读指令次数': 0,
+            '不命中次数': 0
+          },
+          readData: {
+            '读数据次数': 0,
+            '不命中次数': 0,
+          },
+          writeData: {
+            '写数据次数': 0,
+            '不命中次数': 0
+          }
+        },
         cacheType: 'unionCache',
         source: 'file',
         loadMessage: '',
@@ -113,6 +150,26 @@
         }
       }
     },
+    computed: {
+      simulationComputed () {
+        return {
+          summary: {
+            '访问总次数': this.simulationData.readInstruction['读指令次数'] + this.simulationData.readData['读数据次数'] + this.simulationData.writeData['写数据次数'],
+            '不命中次数': this.simulationData.readInstruction['不命中次数'] + this.simulationData.readData['不命中次数'] + this.simulationData.writeData['不命中次数'],
+            '未命中率': (this.simulationData.readInstruction['不命中次数'] + this.simulationData.readData['不命中次数'] + this.simulationData.writeData['不命中次数']) / (this.simulationData.readInstruction['读指令次数'] + this.simulationData.readData['读数据次数'] + this.simulationData.writeData['写数据次数'])
+          },
+          readInstruction: {
+            '未命中率': this.simulationData.readInstruction['不命中次数'] / this.simulationData.readInstruction['读指令次数']
+          },
+          readData: {
+            '未命中率': this.simulationData.readData['不命中次数'] / this.simulationData.readData['读数据次数']
+          },
+          writeData: {
+            '未命中率': this.simulationData.writeData['不命中次数'] / this.simulationData.writeData['写数据次数']
+          }
+        }
+      }
+    },
     methods: {
       fileUpload (e) {
         let file = e.target.files[0]
@@ -124,7 +181,28 @@
           fileReader.readAsText(file)
           fileReader.onload = () => {
             this.loadMessage = 'load Success'
+            this.loadInstruction = fileReader.result.split(/\s/)
+            this.simulationData.writeData['写数据次数'] = 0
+            this.simulationData.readData['读数据次数'] = 0
+            this.simulationData.readInstruction['读指令次数'] = 0
+            this.simulationData.writeData['不命中次数'] = 0
+            this.simulationData.readData['不命中次数'] = 0
+            this.simulationData.readInstruction['不命中次数'] = 0
           }
+        }
+      },
+      run () {
+        let current = this.loadInstruction[2*this.simulationComputed.summary['访问总次数']]
+        switch (current) {
+          case '2':
+            this.simulationData.readInstruction['读指令次数']++
+            break
+          case '0':
+            this.simulationData.readData['读数据次数']++
+            break
+          case '1':
+            this.simulationData.writeData['写数据次数']++
+            break
         }
       }
     }
@@ -144,13 +222,22 @@
 
   aside {
     margin: 0 20px;
-    width: 35%;
+    width: 65%;
   }
 
   main {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     border: solid 2px #00bc9b;
     font-size: 18px;
     padding: 30px;
+  }
+
+  .showing-items {
+    display: block;
+    text-align: center;
+    width: 33%;
   }
 
   #settings {
