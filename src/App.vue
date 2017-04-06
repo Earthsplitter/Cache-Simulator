@@ -25,7 +25,7 @@
         <input type="radio" id="input" value="input" v-model="source">
         <label for="input">手动输入</label>
         <input v-if="source === 'file'" type="file" @change="fileUpload"/>
-        <p v-if="source === 'file'">{{loadMessage}}</p>
+        <p id="load-message" v-if="source === 'file'">{{loadMessage}}</p>
       </section>
       <section>
         <div class="control-panel" v-if="source === 'file'">
@@ -50,19 +50,19 @@
         {{key}}: {{data}}
       </span>
       <span class="showing-items" v-for="(data,key) in simulationComputed.readInstruction">
-        {{key}}: {{data}}
+        {{key}}: {{data}}%
       </span>
       <span class="showing-items" v-for="(data,key) in simulationData.readData">
         {{key}}: {{data}}
       </span>
       <span class="showing-items" v-for="(data,key) in simulationComputed.readData">
-        {{key}}: {{data}}
+        {{key}}: {{data}}%
       </span>
       <span class="showing-items" v-for="(data,key) in simulationData.writeData">
         {{key}}: {{data}}
       </span>
       <span class="showing-items" v-for="(data,key) in simulationComputed.writeData">
-        {{key}}: {{data}}
+        {{key}}: {{data}}%
       </span>
     </main>
   </div>
@@ -79,6 +79,8 @@
     },
     data () {
       return {
+        unionCache: [],
+        unionTime: [],
         loadInstruction: [],
         simulationData: {
           readInstruction: {
@@ -100,7 +102,7 @@
         address: '',
         unionCacheSize: {
           name: '统一Cache大小',
-          options: ['2KB', '4KB', '8KB', '16KB', '32KB', '64KB', '128KB', '256KB', '512KB', '1MB'],
+          options: ['2KB', '4KB', '8KB', '16KB', '32KB', '64KB', '128KB', '256KB', '512KB', '1024KB'],
           selected: '64KB'
         },
         dataCacheSize: {
@@ -156,16 +158,16 @@
           summary: {
             '访问总次数': this.simulationData.readInstruction['读指令次数'] + this.simulationData.readData['读数据次数'] + this.simulationData.writeData['写数据次数'],
             '不命中次数': this.simulationData.readInstruction['不命中次数'] + this.simulationData.readData['不命中次数'] + this.simulationData.writeData['不命中次数'],
-            '未命中率': (this.simulationData.readInstruction['不命中次数'] + this.simulationData.readData['不命中次数'] + this.simulationData.writeData['不命中次数']) / (this.simulationData.readInstruction['读指令次数'] + this.simulationData.readData['读数据次数'] + this.simulationData.writeData['写数据次数'])
+            '未命中率': (100 * (this.simulationData.readInstruction['不命中次数'] + this.simulationData.readData['不命中次数'] + this.simulationData.writeData['不命中次数']) / (this.simulationData.readInstruction['读指令次数'] + this.simulationData.readData['读数据次数'] + this.simulationData.writeData['写数据次数'])).toFixed(2) + '%'
           },
           readInstruction: {
-            '未命中率': this.simulationData.readInstruction['不命中次数'] / this.simulationData.readInstruction['读指令次数']
+            '未命中率': (100 * this.simulationData.readInstruction['不命中次数'] / this.simulationData.readInstruction['读指令次数']).toFixed(2)
           },
           readData: {
-            '未命中率': this.simulationData.readData['不命中次数'] / this.simulationData.readData['读数据次数']
+            '未命中率': (100 * this.simulationData.readData['不命中次数'] / this.simulationData.readData['读数据次数']).toFixed(2)
           },
           writeData: {
-            '未命中率': this.simulationData.writeData['不命中次数'] / this.simulationData.writeData['写数据次数']
+            '未命中率': (100 * this.simulationData.writeData['不命中次数'] / this.simulationData.writeData['写数据次数']).toFixed(2)
           }
         }
       }
@@ -182,6 +184,8 @@
           fileReader.onload = () => {
             this.loadMessage = 'load Success'
             this.loadInstruction = fileReader.result.split(/\s/)
+            this.unionCache = []
+            this.unionTime = []
             this.simulationData.writeData['写数据次数'] = 0
             this.simulationData.readData['读数据次数'] = 0
             this.simulationData.readInstruction['读指令次数'] = 0
@@ -192,17 +196,67 @@
         }
       },
       run () {
-        let current = this.loadInstruction[2*this.simulationComputed.summary['访问总次数']]
-        switch (current) {
-          case '2':
-            this.simulationData.readInstruction['读指令次数']++
-            break
+        let type = this.loadInstruction[2*this.simulationComputed.summary['访问总次数']]
+        let address = this.loadInstruction[2*this.simulationComputed.summary['访问总次数']+1]
+        switch (type) {
           case '0':
-            this.simulationData.readData['读数据次数']++
-            break
+            this.simulationData.readData['读数据次数'] ++
+            break;
           case '1':
-            this.simulationData.writeData['写数据次数']++
-            break
+            this.simulationData.writeData['写数据次数'] ++
+            break;
+          case '2':
+            this.simulationData.readInstruction['读指令次数'] ++
+            break;
+        }
+        if (type === '2' && this.cacheType === 'independentCache') {
+          this.fetchInstruction()
+        } else {
+          this.accessData(type, address)
+        }
+      },
+      fetchInstruction () {
+
+      },
+      accessData (type, address) {
+        let realAddress = Math.floor(parseInt(address, 16) / this.blockSize.selected.slice(0, -1))
+
+        if (this.cacheType === 'unionCache') {
+          let miss = true
+          let cacheBlockNumber = this.unionCacheSize.selected.slice(0, -2) * 1024 / this.blockSize.selected.slice(0, -1)
+          let setNumber = cacheBlockNumber / ( (this.association.selected === '直接映像') ? 1 : this.association.selected.slice(0, -1) )
+          let cacheAddress = realAddress % setNumber
+          for (let i = cacheAddress; i < cacheBlockNumber; i += setNumber) {
+            if (this.unionCache[i] === realAddress) {
+              miss = false
+              if (this.replacePolicy.selected === 'LRU') {
+                this.unionTime[i] = this.simulationComputed.summary['访问总次数'] - 1
+              }
+            }
+          }
+          if (miss === true) {
+            let replaceAddress = cacheAddress
+            for (let i = replaceAddress + setNumber; i < cacheBlockNumber; i += setNumber) {
+              if (this.unionTime[i] < this.unionTime[replaceAddress]) {
+                replaceAddress = i
+              }
+            }
+            this.unionCache[replaceAddress] = realAddress
+            this.unionTime[replaceAddress] = this.simulationComputed.summary['访问总次数'] - 1
+            switch (type) {
+              case '0':
+                this.simulationData.readData['不命中次数'] ++
+                break;
+              case '1':
+                this.simulationData.writeData['不命中次数'] ++
+                break;
+              case '2':
+                this.simulationData.readInstruction['不命中次数'] ++
+                break;
+            }
+          }
+        } else {
+
         }
       }
     }
@@ -286,5 +340,11 @@
   input[type='text'] {
     height: 20px;
     margin: 10px;
+  }
+  #load-message {
+    text-align: center;
+    margin-bottom: -10px;
+    font-weight: bold;
+    color: red;
   }
 </style>
