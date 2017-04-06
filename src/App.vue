@@ -2,6 +2,8 @@
   <div id="app">
     <aside>
       <section id="settings">
+        <span style="font-weight: bold">设置参数:</span>
+        <button @click="reset">Reset</button>
         <div id="cache-type">
           <input type="radio" id="unionCache" value="unionCache" v-model="cacheType">
           <label for="unionCache">统一Cache</label>
@@ -184,29 +186,32 @@
           fileReader.onload = () => {
             this.loadMessage = 'load Success'
             this.loadInstruction = fileReader.result.split(/\s/)
-            this.unionCache = []
-            this.unionTime = []
-            this.simulationData.writeData['写数据次数'] = 0
-            this.simulationData.readData['读数据次数'] = 0
-            this.simulationData.readInstruction['读指令次数'] = 0
-            this.simulationData.writeData['不命中次数'] = 0
-            this.simulationData.readData['不命中次数'] = 0
-            this.simulationData.readInstruction['不命中次数'] = 0
+            this.reset()
           }
         }
       },
+      reset () {
+        this.simulationData.writeData['写数据次数'] = 0
+        this.simulationData.readData['读数据次数'] = 0
+        this.simulationData.readInstruction['读指令次数'] = 0
+        this.simulationData.writeData['不命中次数'] = 0
+        this.simulationData.readData['不命中次数'] = 0
+        this.simulationData.readInstruction['不命中次数'] = 0
+        this.unionCache = []
+        this.unionTime = []
+      },
       run () {
-        let type = this.loadInstruction[2*this.simulationComputed.summary['访问总次数']]
-        let address = this.loadInstruction[2*this.simulationComputed.summary['访问总次数']+1]
+        let type = this.loadInstruction[2 * this.simulationComputed.summary['访问总次数']]
+        let address = this.loadInstruction[2 * this.simulationComputed.summary['访问总次数'] + 1]
         switch (type) {
           case '0':
-            this.simulationData.readData['读数据次数'] ++
+            this.simulationData.readData['读数据次数']++
             break;
           case '1':
-            this.simulationData.writeData['写数据次数'] ++
+            this.simulationData.writeData['写数据次数']++
             break;
           case '2':
-            this.simulationData.readInstruction['读指令次数'] ++
+            this.simulationData.readInstruction['读指令次数']++
             break;
         }
         if (type === '2' && this.cacheType === 'independentCache') {
@@ -216,8 +221,7 @@
         }
       },
       executeAll () {
-        console.log(this.loadInstruction)
-        while (this.simulationComputed.summary['访问总次数']*2 < this.loadInstruction.length) {
+        while (this.simulationComputed.summary['访问总次数'] * 2 < this.loadInstruction.length) {
           this.run()
         }
       },
@@ -231,7 +235,7 @@
           let miss = true
           let cacheBlockNumber = this.unionCacheSize.selected.slice(0, -2) * 1024 / this.blockSize.selected.slice(0, -1)
           let setNumber = cacheBlockNumber / ( (this.association.selected === '直接映像') ? 1 : this.association.selected.slice(0, -1) )
-          let cacheAddress = realAddress % setNumber
+          let cacheAddress = realAddress & (setNumber - 1)
           for (let i = cacheAddress; i < cacheBlockNumber; i += setNumber) {
             if (this.unionCache[i] === realAddress) {
               miss = false
@@ -243,7 +247,7 @@
           if (miss === true) {
             let replaceAddress = cacheAddress
             for (let i = replaceAddress + setNumber; i < cacheBlockNumber; i += setNumber) {
-              if (this.unionTime[i] < this.unionTime[replaceAddress]) {
+              if (this.unionTime[i] === undefined || this.unionTime[i] < this.unionTime[replaceAddress]) {
                 replaceAddress = i
               }
             }
@@ -251,13 +255,13 @@
             this.unionTime[replaceAddress] = this.simulationComputed.summary['访问总次数'] - 1
             switch (type) {
               case '0':
-                this.simulationData.readData['不命中次数'] ++
+                this.simulationData.readData['不命中次数']++
                 break;
               case '1':
-                this.simulationData.writeData['不命中次数'] ++
+                this.simulationData.writeData['不命中次数']++
                 break;
               case '2':
-                this.simulationData.readInstruction['不命中次数'] ++
+                this.simulationData.readInstruction['不命中次数']++
                 break;
             }
           }
@@ -281,7 +285,7 @@
   }
 
   aside {
-    margin: 0 20px;
+    margin: 0 10px;
     width: 65%;
   }
 
@@ -291,7 +295,7 @@
     justify-content: center;
     border: solid 2px #00bc9b;
     font-size: 18px;
-    padding: 30px;
+    padding: 20px;
   }
 
   .showing-items {
@@ -303,7 +307,7 @@
   #settings {
     border: solid 2px #00bc9b;
     font-size: 18px;
-    padding: 30px;
+    padding: 20px;
   }
 
   #cache-type {
@@ -319,7 +323,7 @@
     display: flex;
     justify-content: center;
     flex-wrap: wrap;
-    margin: 20px 0;
+    margin: 10px 0;
     border: solid 2px #00bc9b;
     padding: 20px;
   }
@@ -329,7 +333,7 @@
     border: solid 1px #00bc9b;
     margin: 0 20px;
     height: 45px;
-    width: 120px;
+    width: 100px;
     border-radius: 15px;
     cursor: pointer;
   }
@@ -347,6 +351,7 @@
     height: 20px;
     margin: 10px;
   }
+
   #load-message {
     text-align: center;
     margin-bottom: -10px;
