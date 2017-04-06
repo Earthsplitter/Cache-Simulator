@@ -30,7 +30,7 @@
       <section>
         <div class="control-panel" v-if="source === 'file'">
           <button @click="run">Single Step</button>
-          <button>Execute Automatically</button>
+          <button @click="executeAll">Execute Automatically</button>
         </div>
         <div v-if="source === 'input'" class="control-panel">
           <my-select :model="accessType"></my-select>
@@ -213,6 +213,12 @@
           this.fetchInstruction()
         } else {
           this.accessData(type, address)
+        }
+      },
+      executeAll () {
+        console.log(this.loadInstruction)
+        while (this.simulationComputed.summary['访问总次数']*2 < this.loadInstruction.length) {
+          this.run()
         }
       },
       fetchInstruction () {
