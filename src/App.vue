@@ -81,13 +81,18 @@
     },
     data () {
       return {
-        unionCache: [],
-        dataCache: [],
-        instructionCache: [],
-        unionTime: [],
-        dataTime: [],
-        instructionTime: [],
-        loadInstruction: [],
+        unionCache: {
+          cache: [],
+          time: []
+        },
+        dataCache: {
+          cache: [],
+          time: []
+        },
+        instructionCache: {
+          cache: [],
+          time: []
+        },
         simulationData: {
           readInstruction: {
             '读指令次数': 0,
@@ -201,12 +206,12 @@
         this.simulationData.writeData['不命中次数'] = 0
         this.simulationData.readData['不命中次数'] = 0
         this.simulationData.readInstruction['不命中次数'] = 0
-        this.unionCache = []
-        this.unionTime = []
-        this.dataCache = []
-        this.dataTime = []
-        this.instructionCache = []
-        this.instructionTime = []
+        this.unionCache.cache = []
+        this.unionCache.time = []
+        this.dataCache.cache = []
+        this.dataCache.time = []
+        this.instructionCache.cache = []
+        this.instructionCache.time = []
       },
       run () {
         let type = this.loadInstruction[2 * this.simulationComputed.summary['访问总次数']]
@@ -222,113 +227,65 @@
             this.simulationData.readInstruction['读指令次数']++
             break;
         }
-        if (type === '2' && this.cacheType === 'independentCache') {
-          this.fetchInstruction(address)
-        } else {
-          this.accessData(type, address)
-        }
+        this.accessCache(type, address)
       },
       executeAll () {
         while (this.simulationComputed.summary['访问总次数'] * 2 < this.loadInstruction.length) {
           this.run()
         }
       },
-      fetchInstruction (address) {
+      accessCache (type, address) {
         let realAddress = Math.floor(parseInt(address, 16) / this.blockSize.selected.slice(0, -1))
-        let cacheBlockNumber = this.instructionCacheSize.selected.slice(0, -2) * 1024 / this.blockSize.selected.slice(0, -1)
+        let cacheBlockNumber = null
+        let cache = null
+        let miss = true
+        if (this.cacheType === 'independentCache') {
+          if (type === '2') {
+            cache = this.instructionCache
+            cacheBlockNumber = this.instructionCacheSize.selected.slice(0, -2) * 1024 / this.blockSize.selected.slice(0, -1)
+          } else {
+            cache = this.dataCache
+            cacheBlockNumber = this.dataCacheSize.selected.slice(0, -2) * 1024 / this.blockSize.selected.slice(0, -1)
+          }
+        } else {
+          cache = this.unionCache
+          cacheBlockNumber = this.unionCacheSize.selected.slice(0, -2) * 1024 / this.blockSize.selected.slice(0, -1)
+        }
         let setNumber = cacheBlockNumber / ( (this.association.selected === '直接映像') ? 1 : this.association.selected.slice(0, -1) )
         let cacheAddress = realAddress % setNumber
-        let miss = true
         for (let i = cacheAddress; i < cacheBlockNumber; i += setNumber) {
-          if (this.instructionCache[i] === realAddress) {
+          if (cache.cache[i] === realAddress) {
             miss = false
             if (this.replacePolicy.selected === 'LRU') {
-              this.instructionTime[i] = this.simulationComputed.summary['访问总次数'] - 1
+              cache.time[i] = this.simulationComputed.summary['访问总次数'] - 1
             }
             break
           }
         }
         if (miss === true) {
           let replaceAddress = cacheAddress
-          for (let i = replaceAddress + setNumber; i < cacheBlockNumber; i += setNumber) {
-            if (this.instructionTime[i] === undefined || this.instructionTime[i] < this.instructionTime[replaceAddress]) {
-              replaceAddress = i
-            }
-          }
-          this.instructionCache[replaceAddress] = realAddress
-          this.instructionTime[replaceAddress] = this.simulationComputed.summary['访问总次数'] - 1
-          this.simulationData.readInstruction['不命中次数']++
-        }
-      },
-      accessData (type, address) {
-        let realAddress = Math.floor(parseInt(address, 16) / this.blockSize.selected.slice(0, -1))
-
-        let miss = true
-
-        if (this.cacheType === 'unionCache') {
-          let cacheBlockNumber = this.unionCacheSize.selected.slice(0, -2) * 1024 / this.blockSize.selected.slice(0, -1)
-          let setNumber = cacheBlockNumber / ( (this.association.selected === '直接映像') ? 1 : this.association.selected.slice(0, -1) )
-          let cacheAddress = realAddress % setNumber
-          for (let i = cacheAddress; i < cacheBlockNumber; i += setNumber) {
-            if (this.unionCache[i] === realAddress) {
-              miss = false
-              if (this.replacePolicy.selected === 'LRU') {
-                this.unionTime[i] = this.simulationComputed.summary['访问总次数'] - 1
-              }
-              break
-            }
-          }
-          if (miss === true) {
-            let replaceAddress = cacheAddress
+          if (this.replacePolicy.selected === 'RAND') {
+            let blockPerSet = (this.association.selected === '直接映像') ? 1 : this.association.selected.slice(0, -1)
+            replaceAddress += Math.floor(Math.random() * blockPerSet) * setNumber
+          } else {
             for (let i = replaceAddress + setNumber; i < cacheBlockNumber; i += setNumber) {
-              if (this.unionTime[i] === undefined || this.unionTime[i] < this.unionTime[replaceAddress]) {
+              if (cache.time[i] === undefined || cache.time[i] < cache.time[replaceAddress]) {
                 replaceAddress = i
               }
             }
-            this.unionCache[replaceAddress] = realAddress
-            this.unionTime[replaceAddress] = this.simulationComputed.summary['访问总次数'] - 1
-            switch (type) {
-              case '0':
-                this.simulationData.readData['不命中次数']++
-                break;
-              case '1':
-                this.simulationData.writeData['不命中次数']++
-                break;
-              case '2':
-                this.simulationData.readInstruction['不命中次数']++
-                break;
-            }
           }
-        } else {
-          let cacheBlockNumber = this.dataCacheSize.selected.slice(0, -2) * 1024 / this.blockSize.selected.slice(0, -1)
-          let setNumber = cacheBlockNumber / ( (this.association.selected === '直接映像') ? 1 : this.association.selected.slice(0, -1) )
-          let cacheAddress = realAddress % setNumber
-          for (let i = cacheAddress; i < cacheBlockNumber; i += setNumber) {
-            if (this.dataCache[i] === realAddress) {
-              miss = false
-              if (this.replacePolicy.selected === 'LRU') {
-                this.dataTime[i] = this.simulationComputed.summary['访问总次数'] - 1
-              }
-              break
-            }
-          }
-          if (miss === true) {
-            let replaceAddress = cacheAddress
-            for (let i = replaceAddress + setNumber; i < cacheBlockNumber; i += setNumber) {
-              if (this.dataTime[i] === undefined || this.dataTime[i] < this.dataTime[replaceAddress]) {
-                replaceAddress = i
-              }
-            }
-            this.dataCache[replaceAddress] = realAddress
-            this.dataTime[replaceAddress] = this.simulationComputed.summary['访问总次数'] - 1
-            switch (type) {
-              case '0':
-                this.simulationData.readData['不命中次数']++
-                break;
-              case '1':
-                this.simulationData.writeData['不命中次数']++
-                break;
-            }
+          cache.cache[replaceAddress] = realAddress
+          cache.time[replaceAddress] = this.simulationComputed.summary['访问总次数'] - 1
+          switch (type) {
+            case '0':
+              this.simulationData.readData['不命中次数']++
+              break;
+            case '1':
+              this.simulationData.writeData['不命中次数']++
+              break;
+            case '2':
+              this.simulationData.readInstruction['不命中次数']++
+              break;
           }
         }
       }
@@ -349,7 +306,7 @@
 
   aside {
     margin: 0 10px;
-    width: 65%;
+    width: 35%;
   }
 
   main {
@@ -359,6 +316,7 @@
     border: solid 2px #00bc9b;
     font-size: 18px;
     padding: 20px;
+    width: 65%;
   }
 
   .showing-items {
